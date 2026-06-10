@@ -11,7 +11,7 @@ export POD_RADAR_ENDPOINT="https://api.podradar.example.com"
 export POD_RADAR_API_KEY="pod-radar_xxxxxxxxxxxxxxxx"
 
 export POD_RADAR_CRAWLER_ENDPOINT="https://crawler.podradar.example.com"
-export POD_RADAR_CRAWLER_KEY="podradar-cl_xxxxxxxxxxxx"
+export POD_RADAR_CRAWLER_KEY="pod-radar_xxxxxxxxxxxx"
 ```
 
 可选:

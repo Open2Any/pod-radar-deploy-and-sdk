@@ -1,15 +1,14 @@
 # hihumbird 爬虫系统 · 部署 + SDK
 
-独立交付包：部署爬虫系统 + 接入爬虫 Java SDK。与图搜主系统无关（独立库 / 独立桶 / 独立鉴权）。
+部署爬虫系统 + 接入爬虫 Java SDK。与图搜主系统无关（独立库 / 独立桶 / 独立鉴权）。
 
 ## 部署（Docker Hub 拉取，无需构建）
 
-爬虫系统需要 browserless（商品图无头浏览器渲染），先起它再起应用：
+browserless（商品图无头浏览器渲染）已是 `compose.crawler.yml` 内的服务，`up -d` 时一并起，无需单独启动：
 
 ```bash
 cd deploy
 cp compose.crawler.env.example .env     # 按需改：CRAWLER_IMAGE、库、S3、hihumbird 账号、CRAWLER_HISTORY_ORDER_DAYS 等
-docker compose -f docker-compose.browserless.yml up -d
 docker compose -f compose.crawler.yml pull
 docker compose -f compose.crawler.yml up -d
 ```
@@ -20,7 +19,7 @@ docker compose -f compose.crawler.yml up -d
 
 ## SDK
 
-- 现成 jar + Demo：见 [`sdk-dist/`](sdk-dist/)。爬虫 SDK **需两个 jar**（`crawler-sdk-0.1.0.jar` + `sdk-core-0.1.0.jar`）一起放 classpath，详见该目录 `README.md`。
+- 现成 jar + Demo：见 [`sdk-dist/`](sdk-dist/)。爬虫 SDK 是**单个自包含 jar**（`crawler-sdk-0.1.0.jar`，已内含 `sdk-core`），`javac -cp crawler-sdk-0.1.0.jar` 即可，详见该目录 `README.md`。
 - 源码 / 自行构建：见仓库根 [`../sdk/`](../sdk/)。
 
 ## 历史订单门（>90 天）
