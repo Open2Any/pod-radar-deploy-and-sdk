@@ -1,0 +1,219 @@
+package io.podradar.crawler;
+
+import io.podradar.crawler.model.CrawlerKey;
+import io.podradar.crawler.model.CreateKeyResponse;
+import io.podradar.crawler.model.HihumbirdSettings;
+import io.podradar.crawler.model.HihumbirdSyncState;
+import io.podradar.crawler.model.ItemRetryResponse;
+import io.podradar.crawler.model.ItemsFilter;
+import io.podradar.crawler.model.ItemsListResponse;
+import io.podradar.crawler.model.MeResponse;
+import io.podradar.crawler.model.RescanResponse;
+import io.podradar.crawler.model.RetryFailedKindRequest;
+import io.podradar.crawler.model.RetryFailedKindResponse;
+import io.podradar.crawler.model.RetryRunResponse;
+import io.podradar.crawler.model.RunRequest;
+import io.podradar.crawler.model.RunResponse;
+import io.podradar.crawler.model.RunsListResponse;
+import io.podradar.crawler.model.SettingsResponse;
+import io.podradar.crawler.model.StopRetryResponse;
+import io.podradar.sdk.internal.HttpExecutor;
+import io.podradar.sdk.internal.Json;
+import io.podradar.sdk.internal.JsonReader;
+import io.podradar.sdk.internal.JsonWriter;
+import io.podradar.sdk.internal.SdkConfig;
+import io.podradar.sdk.model.PageQuery;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Synchronous client for the pod-radar crawler service ({@code /api/v1/hihumbird/*} +
+ * {@code /api/v1/keys/*}). Internal admin tool — not published to Maven Central.
+ */
+public final class CrawlerClient implements AutoCloseable {
+    private static final String API = "/api/v1";
+
+    private final HttpExecutor http;
+
+    private CrawlerClient(HttpExecutor http) {
+        this.http = http;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    // ───── settings ───────────────────────────────────────────────────
+
+    public SettingsResponse getSettings() {
+        String body = http.getJson(API + "/hihumbird/settings");
+        return SettingsResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    public HihumbirdSettings updateSettings(HihumbirdSettings s) {
+        String body = http.putJson(API + "/hihumbird/settings", JsonWriter.write(s.toJson()));
+        Map<String, Object> o = JsonReader.parseObject(body);
+        return HihumbirdSettings.fromJson(Json.obj(o, "settings"));
+    }
+
+    // ───── runs ───────────────────────────────────────────────────────
+
+    public RunResponse startRun(RunRequest req) {
+        String body = http.postJson(API + "/hihumbird/runs", JsonWriter.write(req.toJson()));
+        return RunResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    public RunsListResponse listRuns(PageQuery page) {
+        String path = API + "/hihumbird/runs?limit=" + page.limit() + "&offset=" + page.offset();
+        return RunsListResponse.fromJson(JsonReader.parseObject(http.getJson(path)));
+    }
+
+    public RetryRunResponse retryFailedRun(long runId) {
+        String body = http.postJson(API + "/hihumbird/runs/" + runId + "/retry-failed", "{}");
+        return RetryRunResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    public RescanResponse rescanPendingLabels() {
+        String body = http.postJson(API + "/hihumbird/rescan-pending-labels", "{}");
+        return RescanResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    /**
+     * Retry all failed assets of one kind within the request's filter (the "重试所有失败X"
+     * buttons). Creates {@code status='done'} enqueue-type batch(es); product_image is
+     * auto-chunked by 1000 and re-rendered via the headless browser. Returns {@code status="empty"}
+     * when nothing failed under the filter.
+     */
+    public RetryFailedKindResponse retryFailedKind(RetryFailedKindRequest req) {
+        String body = http.postJson(API + "/hihumbird/retry-failed", JsonWriter.write(req.toJson()));
+        return RetryFailedKindResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    /** Stop an in-progress enqueue-type retry batch (signals harvest to stop + flushes its queue). */
+    public StopRetryResponse stopRetry(long runId) {
+        String body = http.postJson(API + "/hihumbird/runs/" + runId + "/stop-retry", "{}");
+        return StopRetryResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    /**
+     * Force the incremental cursor to {@code at} (ISO-8601 / datetime-local), or clear it with
+     * {@code null} (back to "no cursor"). Takes effect immediately; the next incremental sync
+     * resumes from {@code at - overlap}. Returns the updated cursor state.
+     */
+    public HihumbirdSyncState setCursor(String at) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("at", at);
+        String body = http.postJson(API + "/hihumbird/cursor", JsonWriter.write(json));
+        return HihumbirdSyncState.fromJson(Json.obj(JsonReader.parseObject(body), "state"));
+    }
+
+    public ItemsListResponse listRunItems(long runId, PageQuery page) {
+        String path = API + "/hihumbird/runs/" + runId + "/items"
+                + "?limit=" + page.limit() + "&offset=" + page.offset();
+        return ItemsListResponse.fromJson(JsonReader.parseObject(http.getJson(path)));
+    }
+
+    // ───── items ──────────────────────────────────────────────────────
+
+    public ItemsListResponse listItems(ItemsFilter filter) {
+        String path = API + "/hihumbird/items" + qs(filter.toQueryParams());
+        return ItemsListResponse.fromJson(JsonReader.parseObject(http.getJson(path)));
+    }
+
+    public ItemRetryResponse retryItem(long itemId) {
+        String body = http.postJson(API + "/hihumbird/items/" + itemId + "/retry", "{}");
+        return new ItemRetryResponse(JsonReader.parseObject(body));
+    }
+
+    // ───── keys ───────────────────────────────────────────────────────
+
+    public List<CrawlerKey> listKeys() {
+        Map<String, Object> o = JsonReader.parseObject(http.getJson(API + "/keys"));
+        List<CrawlerKey> out = new ArrayList<>();
+        for (Object raw : Json.list(o, "keys")) {
+            out.add(CrawlerKey.fromJson(Json.asMap(raw)));
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    public CreateKeyResponse createKey(String name) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("name", name);
+        String body = http.postJson(API + "/keys", JsonWriter.write(json));
+        return CreateKeyResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    public void revokeKey(long id) {
+        http.postJson(API + "/keys/" + id + "/revoke", "{}");
+    }
+
+    public void deleteKey(long id) {
+        http.deleteJson(API + "/keys/" + id);
+    }
+
+    // ───── misc ───────────────────────────────────────────────────────
+
+    public MeResponse me() {
+        return MeResponse.fromJson(JsonReader.parseObject(http.getJson(API + "/me")));
+    }
+
+    // ───── helpers ────────────────────────────────────────────────────
+
+    static String qs(Map<String, String> params) {
+        if (params == null || params.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder("?");
+        boolean first = true;
+        for (Map.Entry<String, String> e : params.entrySet()) {
+            if (!first) sb.append('&');
+            sb.append(URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8));
+            sb.append('=');
+            sb.append(URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8));
+            first = false;
+        }
+        return sb.toString();
+    }
+
+    /** Returns the read-only effective config. */
+    public SdkConfig config() { return http.config(); }
+
+    /** Package-private accessor used by {@link CrawlerAsyncClient#wrap}. */
+    HttpExecutor http() { return http; }
+
+    @Override
+    public void close() {
+        // java.net.http.HttpClient has no explicit close in JDK 11.
+    }
+
+    // ───── Builder ────────────────────────────────────────────────────
+
+    public static final class Builder {
+        private final SdkConfig.Builder cfg = SdkConfig.builder();
+
+        public Builder() {
+            // Crawler default user agent + longer request timeout
+            cfg.userAgent("podradar-crawler-sdk/0.1.0");
+            cfg.requestTimeout(Duration.ofMinutes(2));
+        }
+
+        public Builder endpoint(String url) { cfg.endpoint(url); return this; }
+        public Builder endpoint(URI uri) { cfg.endpoint(uri); return this; }
+        public Builder apiKey(String key) { cfg.apiKey(key); return this; }
+        public Builder connectTimeout(Duration d) { cfg.connectTimeout(d); return this; }
+        public Builder requestTimeout(Duration d) { cfg.requestTimeout(d); return this; }
+        public Builder userAgent(String ua) { cfg.userAgent(ua); return this; }
+        public Builder retryOnServerError(boolean on) { cfg.retryOnServerError(on); return this; }
+        public Builder maxRetries(int n) { cfg.maxRetries(n); return this; }
+
+        public CrawlerClient build() {
+            return new CrawlerClient(new HttpExecutor(cfg.build()));
+        }
+    }
+}

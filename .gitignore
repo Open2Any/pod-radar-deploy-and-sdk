@@ -1,0 +1,18 @@
+# Java build output (sdk/ is source; built jars live in <scenario>/sdk-dist/ and ARE committed)
+target/
+*.class
+dependency-reduced-pom.xml
+
+# Examples runtime output
+sdk/examples/output/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store

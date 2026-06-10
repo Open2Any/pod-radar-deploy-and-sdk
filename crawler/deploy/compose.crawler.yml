@@ -1,0 +1,171 @@
+name: pod-radar-crawler
+
+# Standalone hihumbird crawler system only.
+#
+# Start:
+#   docker compose -f compose.crawler.yml up -d
+
+x-log-options: &log-options
+  driver: json-file
+  options:
+    max-size: "${DOCKER_LOG_MAX_SIZE:-50m}"
+    max-file: "${DOCKER_LOG_MAX_FILE:-10}"
+
+x-app-common: &app-common
+  image: ${CRAWLER_IMAGE:-codedevin/pod-radar-crawler:v1.0.0}
+  restart: unless-stopped
+  logging: *log-options
+  env_file:
+    - ./.env
+  volumes:
+    - ./logs:/app/logs
+
+x-crawler-env: &crawler-env
+  TZ: Asia/Shanghai
+  DATA_DIR: /app/data
+  CRAWLER_HOST: 0.0.0.0
+  CRAWLER_PORT: "3002"
+  CRAWLER_WEB_HOST: 0.0.0.0
+  CRAWLER_WEB_PORT: "5175"
+  CRAWLER_ASSET_PREFIX: ${CRAWLER_ASSET_PREFIX:-}
+  CRAWLER_DATABASE_URL: postgres://${CRAWLER_POSTGRES_USER:-pod_radar}:${CRAWLER_POSTGRES_PASSWORD:-pod_radar_pass}@crawler-postgres:5432/pod_radar_crawler
+  CRAWLER_BACKEND_URL: http://pod-radar-crawler-api:3002
+  CRAWLER_WEB_URL: ${CRAWLER_WEB_URL:-}
+  # CRAWLER_S3_* intentionally comes from .env. This compose stack does not
+  # start MinIO; point CRAWLER_S3_ENDPOINT / credentials at external storage.
+  CRAWLER_BROWSERLESS_WS: ws://browserless:3000
+  BROWSERLESS_TOKEN: ${BROWSERLESS_TOKEN:-pod-radar-browserless}
+  CRAWLER_HARVEST_SCREENSHOT_DIR: ${DOCKER_CRAWLER_HARVEST_SCREENSHOT_DIR:-}
+
+services:
+  crawler-postgres:
+    image: postgres:17
+    restart: unless-stopped
+    logging: *log-options
+    environment:
+      POSTGRES_PASSWORD: ${CRAWLER_POSTGRES_PASSWORD:-pod_radar_pass}
+      POSTGRES_USER: ${CRAWLER_POSTGRES_USER:-pod_radar}
+      POSTGRES_DB: pod_radar_crawler
+    ports:
+      - "${CRAWLER_POSTGRES_HOST_BIND:-0.0.0.0}:${CRAWLER_POSTGRES_HOST_PORT:-5545}:5432"
+    volumes:
+      - crawler_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-pod_radar} -d pod_radar_crawler"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    shm_size: 256mb
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c work_mem=32MB
+      -c maintenance_work_mem=256MB
+      -c effective_cache_size=1GB
+      -c max_connections=100
+
+  browserless:
+    image: ghcr.io/browserless/chromium:v2.49.0
+    init: true
+    restart: unless-stopped
+    logging: *log-options
+    shm_size: 4gb
+    ports:
+      - "${BROWSERLESS_HOST_BIND:-0.0.0.0}:${BROWSERLESS_HOST_PORT:-3010}:3000"
+    environment:
+      TOKEN: ${BROWSERLESS_TOKEN:-pod-radar-browserless}
+      CONCURRENT: "${BROWSERLESS_CONCURRENT:-3}"
+      TIMEOUT: "${BROWSERLESS_TIMEOUT:-600000}"
+      CORS: "true"
+      EXIT_ON_HEALTH_FAILURE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf \"http://localhost:3000/pressure?token=$${TOKEN}\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  crawler-db-push:
+    <<: *app-common
+    restart: "no"
+    environment:
+      <<: *crawler-env
+    depends_on:
+      crawler-postgres:
+        condition: service_healthy
+    command: ["pnpm", "db:push:crawler"]
+
+  pod-radar-crawler-api:
+    <<: *app-common
+    environment:
+      <<: *crawler-env
+    working_dir: /app/packages/crawler
+    depends_on:
+      crawler-postgres:
+        condition: service_healthy
+      crawler-db-push:
+        condition: service_completed_successfully
+    ports:
+      - "${CRAWLER_API_HOST_BIND:-0.0.0.0}:${CRAWLER_API_PORT:-3002}:3002"
+    command: ["bun", "run", "start"]
+
+  pod-radar-crawler-web:
+    <<: *app-common
+    environment:
+      <<: *crawler-env
+    working_dir: /app/packages/crawler-web
+    depends_on:
+      pod-radar-crawler-api:
+        condition: service_started
+    ports:
+      - "${CRAWLER_WEB_HOST_BIND:-0.0.0.0}:${CRAWLER_WEB_PORT:-5175}:5175"
+    command: ["pnpm", "start"]
+
+  pod-radar-hihumbird-sync:
+    <<: *app-common
+    environment:
+      <<: *crawler-env
+    working_dir: /app/packages/crawler
+    depends_on:
+      pod-radar-crawler-api:
+        condition: service_started
+    command: ["bun", "run", "src/cli/hihumbird-sync.ts"]
+
+  pod-radar-hihumbird-fetcher:
+    <<: *app-common
+    scale: ${HIHUMBIRD_FETCHER_REPLICAS:-1}
+    environment:
+      <<: *crawler-env
+    working_dir: /app/packages/crawler
+    depends_on:
+      pod-radar-crawler-api:
+        condition: service_started
+    command:
+      - /bin/sh
+      - -c
+      - |
+        exec bun run src/cli/hihumbird-fetcher.ts \
+          --batch "$${HIHUMBIRD_FETCHER_BATCH:-8}" \
+          --concurrency "$${HIHUMBIRD_FETCHER_CONCURRENCY:-8}"
+
+  pod-radar-hihumbird-harvest:
+    <<: *app-common
+    environment:
+      <<: *crawler-env
+    working_dir: /app/packages/crawler
+    depends_on:
+      browserless:
+        condition: service_healthy
+      pod-radar-crawler-api:
+        condition: service_started
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ "$${CRAWLER_HARVEST_ENABLED:-true}" != "true" ]; then
+          echo "CRAWLER_HARVEST_ENABLED is not true; harvest worker is idle."
+          exec sleep infinity
+        fi
+        exec node node_modules/tsx/dist/cli.mjs src/cli/hihumbird-harvest.ts
+
+volumes:
+  crawler_pgdata:

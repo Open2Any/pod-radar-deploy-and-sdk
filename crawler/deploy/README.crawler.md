@@ -1,0 +1,198 @@
+# Crawler Docker Deployment
+
+This guide covers `compose.crawler.yml`, the standalone hihumbird crawler system. Treat this directory as a standalone deployment repository.
+
+The Docker stack does not start MinIO. Configure an external S3-compatible object store with `CRAWLER_S3_*` variables and create the buckets before starting workers.
+
+Browserless is still part of this stack because hihumbird product images require a headless browser to trigger the merchant page's frontend rendering.
+
+## Services
+
+| Service | Purpose |
+| --- | --- |
+| `crawler-postgres` | Standalone crawler database. |
+| `crawler-db-push` | Applies crawler database schema at startup. |
+| `pod-radar-crawler-api` | Crawler API. |
+| `pod-radar-crawler-web` | Crawler web UI. |
+| `pod-radar-hihumbird-sync` | hihumbird order synchronization scheduler. |
+| `pod-radar-hihumbird-fetcher` | Downloads product images, production images, source images, PDFs, and label images. |
+| `browserless` | Headless Chromium service used by the product-image harvest worker. |
+| `pod-radar-hihumbird-harvest` | Opens the hihumbird factory page and triggers frontend product-image rendering. |
+
+## Deploy
+
+1. Copy the example env in this deployment directory:
+
+   ```bash
+   cp compose.crawler.env.example .env
+   ```
+
+   If deploying the main stack on the same machine, merge `compose.env.example` into the same `.env`.
+
+2. Edit `.env`:
+
+   - Set `CRAWLER_IMAGE` to the image tag you want to deploy.
+   - Set a strong `CRAWLER_POSTGRES_PASSWORD`.
+   - Fill `CRAWLER_S3_ENDPOINT`, `CRAWLER_S3_ACCESS_KEY_ID`, `CRAWLER_S3_SECRET_ACCESS_KEY`, and bucket names.
+   - Create the crawler S3 buckets before starting workers.
+   - Set `CRAWLER_ADMIN_KEY`.
+   - Set `HIHUMBIRD_USERNAME` and `HIHUMBIRD_PASSWORD`.
+   - Keep `CRAWLER_HARVEST_ENABLED=true` for product-image rendering, or set it to `false` to disable the headless harvest worker.
+
+3. Start:
+
+   ```bash
+   docker compose -f compose.crawler.yml pull
+   docker compose -f compose.crawler.yml up -d
+   ```
+
+   To mirror the PM2 setup of `6 instances x 8 concurrency` (= 48 parallel downloads), set `HIHUMBIRD_FETCHER_REPLICAS=6` and `HIHUMBIRD_FETCHER_CONCURRENCY=8` in `.env`. Do not run PM2 inside the worker container.
+
+4. Check status and logs:
+
+   ```bash
+   docker compose -f compose.crawler.yml ps
+   docker compose -f compose.crawler.yml logs -f pod-radar-hihumbird-sync
+   docker compose -f compose.crawler.yml logs -f pod-radar-hihumbird-harvest
+   ```
+
+5. Open the crawler UI:
+
+   ```text
+   http://<server-host>:5175/crawler
+   ```
+
+## Environment Variables
+
+### Host Ports And Browserless
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `CRAWLER_IMAGE` | No | `codedevin/pod-radar-crawler:v1.0.0` | Application image used by crawler API, web, sync, fetcher, and harvest workers. |
+| `CRAWLER_POSTGRES_HOST_BIND` | No | `0.0.0.0` | Host interface for the crawler database. |
+| `CRAWLER_POSTGRES_HOST_PORT` | No | `5545` | Host port mapped to the crawler database. |
+| `CRAWLER_API_HOST_BIND` | No | `0.0.0.0` | Host interface for the crawler API. |
+| `CRAWLER_API_PORT` | No | `3002` | Host port for `pod-radar-crawler-api`. |
+| `CRAWLER_WEB_HOST_BIND` | No | `0.0.0.0` | Host interface for the crawler web UI. |
+| `CRAWLER_WEB_PORT` | No | `5175` | Host port for `pod-radar-crawler-web`. |
+| `BROWSERLESS_HOST_BIND` | No | `0.0.0.0` | Host interface for Browserless. |
+| `BROWSERLESS_HOST_PORT` | No | `3010` | Host port for Browserless. |
+| `BROWSERLESS_CONCURRENT` | No | `3` | Browserless concurrent browser/session limit. |
+| `BROWSERLESS_TIMEOUT` | No | `600000` | Browserless timeout in milliseconds. |
+
+### Database
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `CRAWLER_POSTGRES_USER` | Yes | `pod_radar` | Database user created in `crawler-postgres`. |
+| `CRAWLER_POSTGRES_PASSWORD` | Yes | `pod_radar_pass` | Database password. Change this in production. |
+| `CRAWLER_DATABASE_URL` | Yes | `postgres://pod_radar:pod_radar_pass@127.0.0.1:5545/pod_radar_crawler` | Host-side crawler database URL for local CLI commands. Inside containers, compose overrides it to `crawler-postgres:5432`. |
+
+### Browser-Visible URLs
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `CRAWLER_ASSET_PREFIX` | No | `/crawler` | Public prefix for crawler-web static assets. Leave empty for direct host/port access. Set only when a reverse proxy or CDN serves Next assets under that prefix. |
+| `CRAWLER_WEB_URL` | No | `/crawler` | Browser-visible crawler web URL used by links and redirects. Use a relative path for same-domain reverse proxy or an absolute `https://...` URL for a separate host. |
+
+### Runtime API And Web
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `CRAWLER_HOST` | No | `127.0.0.1` | Host-side crawler API bind address for local non-Docker runs. Containers use `0.0.0.0`. |
+| `CRAWLER_PORT` | No | `3002` | Crawler API port. |
+| `CRAWLER_WEB_HOST` | No | `127.0.0.1` | Host-side crawler web bind address for local non-Docker runs. Containers use `0.0.0.0`. |
+| `CRAWLER_WEB_PORT` | No | `5175` | Crawler web port. |
+| `CRAWLER_BACKEND_URL` | No | `http://127.0.0.1:3002` | Backend URL for local non-Docker runs. Containers use `http://pod-radar-crawler-api:3002`. |
+| `CRAWLER_CORS_ORIGINS` | No | `http://127.0.0.1:5175` | Optional comma-separated CORS allowlist. |
+
+### External Crawler S3
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `CRAWLER_S3_PROVIDER` | Yes | `s3` | Storage provider mode. Use `s3` for external S3-compatible storage. |
+| `CRAWLER_S3_URL_STYLE` | Yes | `virtual-hosted` | URL style: `virtual-hosted` for AWS-like S3, `path` for path-style endpoints. |
+| `CRAWLER_S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint. |
+| `CRAWLER_S3_REGION` | Yes | `us-east-1` | S3 region. |
+| `CRAWLER_S3_ACCESS_KEY_ID` | Yes | `AKIA...` | S3 access key. |
+| `CRAWLER_S3_SECRET_ACCESS_KEY` | Yes | `...` | S3 secret key. |
+| `CRAWLER_S3_BUCKET_IMAGES` | Yes | `pod-radar-crawler-images` | Bucket for crawler images and label page images. |
+| `CRAWLER_S3_BUCKET_DOCS` | Yes | `pod-radar-crawler-docs` | Bucket for original PDF documents. |
+| `CRAWLER_S3_PUBLIC_URL` | No | `https://s3.example.com` | Public base URL when buckets are public. Defaults to `CRAWLER_S3_ENDPOINT`. |
+| `CRAWLER_BUCKET_ACCESS` | Yes | `public` | `public` returns direct object URLs; `private` returns presigned URLs. |
+
+### Crawler Admin
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `CRAWLER_ADMIN_NAME` | Yes | `admin` | Admin name used by the crawler API. |
+| `CRAWLER_ADMIN_KEY` | Yes | `pod-radar_replace_with_a_long_random_value` | Admin API key. Must start with `pod-radar_` and be at least 20 characters. |
+
+Use `CRAWLER_ADMIN_KEY` as the bootstrap key. For additional operator keys, sign in to the crawler UI and create keys there.
+
+### Docker Logs
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `DOCKER_LOG_MAX_SIZE` | No | `50m` | Max size of one Docker `json-file` log segment per container. |
+| `DOCKER_LOG_MAX_FILE` | No | `10` | Number of rotated log segments per container. `50m × 10` caps each container at about 500M. |
+
+### Hihumbird / Flyshark
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `HIHUMBIRD_USERNAME` | Yes | `147...` | hihumbird account username. |
+| `HIHUMBIRD_PASSWORD` | Yes | `...` | hihumbird account password. |
+| `HIHUMBIRD_GROUP_ID` | Yes | `102420649` | hihumbird login group ID. |
+| `HIHUMBIRD_APP_ID` | Yes | `2572668` | hihumbird app ID. |
+| `HIHUMBIRD_REL_TYPE` | Yes | `2` | hihumbird login relation type. |
+| `HIHUMBIRD_SCENE_ID` | Yes | `1f1o1jf9` | hihumbird login scene ID. |
+| `HIHUMBIRD_CURSOR_START_AT` | No | `2025-05-06T00:00:00+08:00` | Initial incremental cursor start time. |
+
+### Product-Image Harvest
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `CRAWLER_HARVEST_ENABLED` | No | `true` | Enables headless browser product-image rendering. Set `false` only if product-image harvest should be disabled. |
+| `CRAWLER_BROWSERLESS_WS` | No | `ws://127.0.0.1:3010` | Host-side Browserless WebSocket URL. Containers override this to `ws://browserless:3000`. |
+| `BROWSERLESS_TOKEN` | Yes if harvest enabled | `pod-radar-browserless` | Browserless token. |
+| `HIHUMBIRD_FACTORY_SLUG` | No | `fnsz-sale` | Factory route slug used by the merchant page. |
+| `HIHUMBIRD_FACTORY_LIST_URL` | No | `https://flyshark.merchant.hihumbird.com/factory/fnsz-sale/produceManage/produceItemsManage` | Override the factory production-list page URL. |
+| `HIHUMBIRD_FACTORY_SESSION_JSON` | No | `{...}` | Optional localStorage/cookie dump for factory page session helpers. Runtime login still refreshes token. |
+| `CRAWLER_HARVEST_RENDER_WAIT_MS` | No | `12000` | Max render wait per page. |
+| `CRAWLER_HARVEST_MAX_PAGES` | No | `500` | Safety cap for page traversal. |
+| `DOCKER_CRAWLER_HARVEST_SCREENSHOT_DIR` | No | `/app/logs/harvest-shots` | Set to save harvest screenshots from inside the container. Empty disables screenshots. |
+
+### Worker Tuning
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `HIHUMBIRD_FETCHER_REPLICAS` | No | `6` | Number of `pod-radar-hihumbird-fetcher` containers (matches the PM2 ecosystem's 6 instances). |
+| `HIHUMBIRD_FETCHER_BATCH` | No | `8` | Rows claimed per hihumbird fetcher loop. |
+| `HIHUMBIRD_FETCHER_CONCURRENCY` | No | `8` | Parallel downloads inside one `pod-radar-hihumbird-fetcher` container. Total download parallelism is replicas multiplied by this value. |
+| `CRAWLER_IMAGE_PROCESS_PIXEL_LIMIT` | No | `false` | Decoded `width × height` pixel limit for hihumbird assets. `false` disables sharp's built-in `268402689` pixel guard for trusted print/source images. Use a number to re-enable a hard limit. |
+| `CRAWLER_HISTORY_ORDER_DAYS` | No | `90` | Orders whose item create time is older than this many days only crawl production + source images; product images (headless harvest) and shipping labels are skipped. Forward-only: applies to runs created after the change (tagged `params.history_gate`); existing runs are unaffected. |
+
+## Common Commands
+
+| Task | Command |
+| --- | --- |
+| Pull configured image | `docker compose -f compose.crawler.yml pull` |
+| Start or update | `docker compose -f compose.crawler.yml up -d` |
+| Stop | `docker compose -f compose.crawler.yml down` |
+| View status | `docker compose -f compose.crawler.yml ps` |
+| API logs | `docker compose -f compose.crawler.yml logs -f pod-radar-crawler-api` |
+| Sync logs | `docker compose -f compose.crawler.yml logs -f pod-radar-hihumbird-sync` |
+| Fetcher logs | `docker compose -f compose.crawler.yml logs -f pod-radar-hihumbird-fetcher` |
+| Harvest logs | `docker compose -f compose.crawler.yml logs -f pod-radar-hihumbird-harvest browserless` |
+| Change hihumbird fetcher replicas | Edit `HIHUMBIRD_FETCHER_REPLICAS`, then run `docker compose -f compose.crawler.yml up -d` |
+
+## Notes
+
+- Buckets are not created by Docker. Create `CRAWLER_S3_BUCKET_IMAGES` and `CRAWLER_S3_BUCKET_DOCS` in your external object store.
+- Product images may remain 403 until the harvest worker opens the hihumbird factory page and triggers frontend rendering.
+- The harvest worker defaults to the hihumbird `历史生产项` tab so both recent and older production items can be rendered by production-item code.
+- `.env` in this directory is the deployment env file. `CRAWLER_DATABASE_URL` in it is useful for host-side scripts; the compose file sets the container-side database URL to the internal service name.
+- `./logs` is relative to this deployment directory.
+- Do not put object-storage credentials in the Dockerfile. Runtime configuration belongs in `.env` or your deployment secret manager.
+- Prefer one process per container. Use `HIHUMBIRD_FETCHER_REPLICAS` for more fetcher containers; do not run PM2 inside these worker containers unless your hosting platform cannot scale services.
