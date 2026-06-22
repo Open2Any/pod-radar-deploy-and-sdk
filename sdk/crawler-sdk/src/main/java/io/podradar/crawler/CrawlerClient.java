@@ -41,6 +41,7 @@ public final class CrawlerClient implements AutoCloseable {
     private static final String API = "/api/v1";
 
     private final HttpExecutor http;
+    private FangguoApi fangguo;
 
     private CrawlerClient(HttpExecutor http) {
         this.http = http;
@@ -48,6 +49,16 @@ public final class CrawlerClient implements AutoCloseable {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Accessor for the fangguo (方果ERP) endpoints under {@code /api/v1/fangguo/*}. Lazily created
+     * and cached; shares this client's connection, endpoint, and API key. The hihumbird methods on
+     * this client are unrelated to fangguo and remain unchanged.
+     */
+    public FangguoApi fangguo() {
+        if (fangguo == null) fangguo = new FangguoApi(http);
+        return fangguo;
     }
 
     // ───── settings ───────────────────────────────────────────────────
