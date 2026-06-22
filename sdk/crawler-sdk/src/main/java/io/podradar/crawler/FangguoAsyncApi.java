@@ -113,4 +113,12 @@ public final class FangguoAsyncApi {
         return http.postJsonAsync(BASE + "/items/" + itemId + "/retry", "{}")
                 .thenApply(b -> FangguoItemRetryResponse.fromJson(JsonReader.parseObject(b)));
     }
+
+    /** {@code force=true} → re-enqueue ALL assets+labels of this order unit, not just failed (see {@link FangguoApi#retryItem(long, boolean)}). */
+    public CompletableFuture<FangguoItemRetryResponse> retryItem(long itemId, boolean force) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("force", force);
+        return http.postJsonAsync(BASE + "/items/" + itemId + "/retry", JsonWriter.write(json))
+                .thenApply(b -> FangguoItemRetryResponse.fromJson(JsonReader.parseObject(b)));
+    }
 }

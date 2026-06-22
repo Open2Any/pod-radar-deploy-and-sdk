@@ -28,6 +28,7 @@ public final class FangguoItem {
     private final String coverStatus;
     private final Integer unitIdx;
     private final Integer unitTotal;
+    private final String sourceCreatedAt;
     private final FangguoOrderInfo order;
     private final List<FangguoAsset> assets;
     private final List<FangguoLabel> labels;
@@ -35,8 +36,8 @@ public final class FangguoItem {
     public FangguoItem(long id, long orderId, String tid, String unitKey, String barcode,
                        String coverTaskId, String oid, String skuId, String skuExtCode,
                        String factoryEncode, String skuProps, String coverStatus, Integer unitIdx,
-                       Integer unitTotal, FangguoOrderInfo order, List<FangguoAsset> assets,
-                       List<FangguoLabel> labels) {
+                       Integer unitTotal, String sourceCreatedAt, FangguoOrderInfo order,
+                       List<FangguoAsset> assets, List<FangguoLabel> labels) {
         this.id = id;
         this.orderId = orderId;
         this.tid = tid;
@@ -51,6 +52,7 @@ public final class FangguoItem {
         this.coverStatus = coverStatus;
         this.unitIdx = unitIdx;
         this.unitTotal = unitTotal;
+        this.sourceCreatedAt = sourceCreatedAt;
         this.order = order;
         this.assets = assets;
         this.labels = labels;
@@ -70,6 +72,7 @@ public final class FangguoItem {
     public String coverStatus()       { return coverStatus; }
     public Integer unitIdx()          { return unitIdx; }
     public Integer unitTotal()        { return unitTotal; }
+    public String sourceCreatedAt()   { return sourceCreatedAt; }
     public FangguoOrderInfo order()   { return order; }
     public List<FangguoAsset> assets() { return assets; }
     public List<FangguoLabel> labels() { return labels; }
@@ -98,6 +101,7 @@ public final class FangguoItem {
                 Json.str(o, "cover_status"),
                 nullableInt(o.get("unit_idx")),
                 nullableInt(o.get("unit_total")),
+                Json.str(o, "source_created_at"),
                 FangguoOrderInfo.fromJson(Json.obj(o, "order")),
                 Collections.unmodifiableList(assets),
                 Collections.unmodifiableList(labels));

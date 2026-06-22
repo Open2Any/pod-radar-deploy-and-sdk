@@ -125,6 +125,14 @@ public final class CrawlerAsyncClient implements AutoCloseable {
                 .thenApply(b -> new ItemRetryResponse(JsonReader.parseObject(b)));
     }
 
+    /** {@code force=true} → re-enqueue ALL assets+labels of this item, not just failed (see {@link CrawlerClient#retryItem(long, boolean)}). */
+    public CompletableFuture<ItemRetryResponse> retryItem(long itemId, boolean force) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("force", force);
+        return http.postJsonAsync(API + "/hihumbird/items/" + itemId + "/retry", JsonWriter.write(json))
+                .thenApply(b -> new ItemRetryResponse(JsonReader.parseObject(b)));
+    }
+
     // ───── keys ───────────────────────────────────────────────────────
 
     public CompletableFuture<List<CrawlerKey>> listKeys() {

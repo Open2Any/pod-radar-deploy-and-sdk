@@ -327,7 +327,9 @@ class FangguoApiTest {
     void listItemsBuildsQueryFromFilter() {
         server.stubFor(get(urlPathEqualTo("/api/v1/fangguo/items"))
                 .willReturn(aResponse().withStatus(200).withBody(
-                        "{\"run\":null,\"items\":[],\"total\":0,\"limit\":10,\"offset\":20," +
+                        "{\"run\":null,\"items\":[{\"id\":901,\"order_id\":77,\"tid\":\"T1\"," +
+                        "\"source_created_at\":\"2026-06-10T00:00:00.000Z\",\"order\":{}," +
+                        "\"assets\":[],\"labels\":[]}],\"total\":1,\"limit\":10,\"offset\":20," +
                         "\"detail_source\":\"all\"}")));
 
         FangguoItemsFilter filter = FangguoItemsFilter.empty()
@@ -335,18 +337,22 @@ class FangguoApiTest {
                 .withQuery("abc")
                 .withShipStatus("shipped")
                 .withCrawlStatus(FangguoCrawlStatus.FAILED)
+                .withCreatedRange(1781136000000L, 1781222399999L)
                 .withPage(PageQuery.of(10, 20));
 
         FangguoItemsResponse resp = client.fangguo().listItems(filter);
-        assertEquals(0, resp.total());
+        assertEquals(1, resp.total());
         assertNull(resp.run());
         assertEquals("all", resp.detailSource());
+        assertEquals("2026-06-10T00:00:00.000Z", resp.items().get(0).sourceCreatedAt());
 
         server.verify(getRequestedFor(urlPathEqualTo("/api/v1/fangguo/items"))
                 .withQueryParam("run_id", equalTo("372"))
                 .withQueryParam("q", equalTo("abc"))
                 .withQueryParam("ship_status", equalTo("shipped"))
                 .withQueryParam("crawl_status", equalTo("failed"))
+                .withQueryParam("created_from", equalTo("1781136000000"))
+                .withQueryParam("created_to", equalTo("1781222399999"))
                 .withQueryParam("limit", equalTo("10"))
                 .withQueryParam("offset", equalTo("20")));
     }
@@ -365,11 +371,12 @@ class FangguoApiTest {
     void retryItemPostsEmptyBody() {
         server.stubFor(post(urlEqualTo("/api/v1/fangguo/items/123/retry"))
                 .willReturn(aResponse().withStatus(202).withBody(
-                        "{\"status\":\"queued\",\"order_unit_id\":123,\"requeued_assets\":1," +
+                        "{\"status\":\"queued\",\"run_id\":778,\"order_unit_id\":123,\"requeued_assets\":1," +
                         "\"requeued_labels\":0}")));
 
         FangguoItemRetryResponse resp = client.fangguo().retryItem(123);
         assertEquals("queued", resp.status());
+        assertEquals(Long.valueOf(778L), resp.runId());
         assertEquals(123L, resp.orderUnitId());
         assertEquals(1, resp.requeuedAssets());
         server.verify(postRequestedFor(urlEqualTo("/api/v1/fangguo/items/123/retry"))

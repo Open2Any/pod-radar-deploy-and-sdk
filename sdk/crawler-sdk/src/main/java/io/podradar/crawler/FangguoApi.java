@@ -132,4 +132,18 @@ public final class FangguoApi {
         String body = http.postJson(BASE + "/items/" + itemId + "/retry", "{}");
         return FangguoItemRetryResponse.fromJson(JsonReader.parseObject(body));
     }
+
+    /**
+     * {@code POST /items/{id}/retry} with {@code {"force":true}}. When {@code force} is true the server
+     * re-enqueues ALL of this order unit's assets + its order's labels regardless of current status
+     * (including already {@code fetched}/{@code downloaded}/{@code converted}), not just failed ones;
+     * labels also drop their cached PDF so it is re-downloaded. {@code force=false} matches
+     * {@link #retryItem(long)}. Throws 404.
+     */
+    public FangguoItemRetryResponse retryItem(long itemId, boolean force) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("force", force);
+        String body = http.postJson(BASE + "/items/" + itemId + "/retry", JsonWriter.write(json));
+        return FangguoItemRetryResponse.fromJson(JsonReader.parseObject(body));
+    }
 }
