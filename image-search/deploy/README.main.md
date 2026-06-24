@@ -140,6 +140,7 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 | `MAIN_FETCHER_REPLICAS` | No | `2` | Number of `pod-radar-fetcher` containers. |
 | `MAIN_FETCHER_BATCH` | No | `8` | Rows claimed per fetcher loop. |
 | `MAIN_FETCHER_CONCURRENCY` | No | `8` | Parallel downloads inside one `pod-radar-fetcher` container. Total download parallelism is replicas multiplied by this value. |
+| `FETCHER_HTTP_TIMEOUT` | No | `60` | Original image HTTP download timeout in seconds. Large/slow source images should keep this at 60s or higher. |
 | `MAIN_EMBED_REPLICAS` | No | `2` | Number of `pod-radar-embed-worker` containers. |
 | `MAIN_EMBED_BATCH` | No | `8` | Rows claimed per embed-worker loop. |
 | `MAIN_EMBED_CONCURRENCY` | No | `4` | Parallel embedding requests inside one embed-worker container. |
