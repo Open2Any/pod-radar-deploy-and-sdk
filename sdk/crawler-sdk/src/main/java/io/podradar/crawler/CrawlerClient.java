@@ -1,7 +1,12 @@
 package io.podradar.crawler;
 
+import io.podradar.crawler.model.AccountTestResult;
+import io.podradar.crawler.model.CrawlerAccount;
 import io.podradar.crawler.model.CrawlerKey;
+import io.podradar.crawler.model.CreateAccountRequest;
+import io.podradar.crawler.model.TestAccountRequest;
 import io.podradar.crawler.model.CreateKeyResponse;
+import io.podradar.crawler.model.UpdateAccountRequest;
 import io.podradar.crawler.model.HihumbirdSettings;
 import io.podradar.crawler.model.HihumbirdSyncState;
 import io.podradar.crawler.model.ItemRetryResponse;
@@ -70,6 +75,19 @@ public final class CrawlerClient implements AutoCloseable {
 
     public HihumbirdSettings updateSettings(HihumbirdSettings s) {
         String body = http.putJson(API + "/hihumbird/settings", JsonWriter.write(s.toJson()));
+        Map<String, Object> o = JsonReader.parseObject(body);
+        return HihumbirdSettings.fromJson(Json.obj(o, "settings"));
+    }
+
+    /** Per-account effective settings (global default merged with this account's override). */
+    public SettingsResponse getSettings(long accountId) {
+        String body = http.getJson(API + "/hihumbird/settings?account_id=" + accountId);
+        return SettingsResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    /** Write this account's settings override (full set; each account schedules on its own cursor/interval). */
+    public HihumbirdSettings updateSettings(long accountId, HihumbirdSettings s) {
+        String body = http.putJson(API + "/hihumbird/settings?account_id=" + accountId, JsonWriter.write(s.toJson()));
         Map<String, Object> o = JsonReader.parseObject(body);
         return HihumbirdSettings.fromJson(Json.obj(o, "settings"));
     }
@@ -184,6 +202,56 @@ public final class CrawlerClient implements AutoCloseable {
         http.deleteJson(API + "/keys/" + id);
     }
 
+    // ───── accounts (upstream login accounts) ──────────────────────────
+
+    /** All upstream login accounts (passwords never returned). */
+    public List<CrawlerAccount> listAccounts() {
+        return listAccounts(null);
+    }
+
+    /** Upstream accounts, optionally filtered by system ("hihumbird" | "fangguo"). */
+    public List<CrawlerAccount> listAccounts(String system) {
+        String path = API + "/accounts" + (system != null ? "?system=" + urlEncode(system) : "");
+        Map<String, Object> o = JsonReader.parseObject(http.getJson(path));
+        List<CrawlerAccount> out = new ArrayList<>();
+        for (Object raw : Json.list(o, "accounts")) {
+            out.add(CrawlerAccount.fromJson(Json.asMap(raw)));
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    /** Register an upstream login account. Throws 409 if (system,name) already exists. */
+    public CrawlerAccount createAccount(CreateAccountRequest req) {
+        String body = http.postJson(API + "/accounts", JsonWriter.write(req.toJson()));
+        return CrawlerAccount.fromJson(JsonReader.parseObject(body));
+    }
+
+    /** Partial update (uses PUT — HttpURLConnection lacks PATCH; server accepts both). Throws 404. */
+    public CrawlerAccount updateAccount(long id, UpdateAccountRequest req) {
+        String body = http.putJson(API + "/accounts/" + id, JsonWriter.write(req.toJson()));
+        return CrawlerAccount.fromJson(JsonReader.parseObject(body));
+    }
+
+    /** Enable/disable an account — convenience over {@link #updateAccount}. */
+    public CrawlerAccount setAccountEnabled(long id, boolean enabled) {
+        return updateAccount(id, UpdateAccountRequest.empty().withEnabled(enabled));
+    }
+
+    /** Soft-delete (revoke) an account; already-crawled orders keep their attribution. Throws 404. */
+    public void deleteAccount(long id) {
+        http.deleteJson(API + "/accounts/" + id);
+    }
+
+    /**
+     * Verify an upstream login without saving (makes a real login call to the upstream system).
+     * A failed login returns {@code ok=false} with the reason — not an exception. Throws on
+     * HTTP 429 (too many concurrent tests) or 400 (neither account_id nor username+password).
+     */
+    public AccountTestResult testAccount(TestAccountRequest req) {
+        String body = http.postJson(API + "/accounts/test", JsonWriter.write(req.toJson()));
+        return AccountTestResult.fromJson(JsonReader.parseObject(body));
+    }
+
     // ───── misc ───────────────────────────────────────────────────────
 
     public MeResponse me() {
@@ -206,7 +274,7 @@ public final class CrawlerClient implements AutoCloseable {
         return sb.toString();
     }
 
-    private static String urlEncode(String s) {
+    static String urlEncode(String s) {
         return Urls.encode(s);
     }
 

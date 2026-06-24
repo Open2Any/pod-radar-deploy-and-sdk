@@ -130,7 +130,7 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 | `EMBEDDING_MODEL` | No | `qwen3-vl-embedding` | Embedding model name. |
 | `EMBEDDING_BASE_URL` | No | `https://dashscope.aliyuncs.com/...` | Embedding API endpoint. |
 | `EMBEDDING_DIMENSION` | No | `2560` | Vector dimension expected by the database. |
-| `EMBEDDING_TIMEOUT` | No | `10` | Embedding request timeout in seconds. |
+| `EMBEDDING_TIMEOUT` | No | `30` | Embedding request timeout in seconds. |
 | `EMBEDDING_API_KEY` | Required if embeddings enabled | `...` | Provider API key. |
 | `EMBEDDING_SLUG` | No | `dashscope_qwen3_vl_embedding` | Optional stable embedding configuration slug. |
 

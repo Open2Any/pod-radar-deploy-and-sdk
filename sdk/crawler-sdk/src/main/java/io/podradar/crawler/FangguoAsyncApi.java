@@ -48,6 +48,18 @@ public final class FangguoAsyncApi {
                 .thenApply(b -> FangguoSettings.fromJson(Json.obj(JsonReader.parseObject(b), "settings")));
     }
 
+    /** Per-account effective settings (global default merged with this account's override). */
+    public CompletableFuture<FangguoSettingsResponse> getSettings(long accountId) {
+        return http.getJsonAsync(BASE + "/settings?account_id=" + accountId)
+                .thenApply(b -> FangguoSettingsResponse.fromJson(JsonReader.parseObject(b)));
+    }
+
+    /** Write this account's settings override (full set). */
+    public CompletableFuture<FangguoSettings> updateSettings(long accountId, FangguoSettings s) {
+        return http.putJsonAsync(BASE + "/settings?account_id=" + accountId, JsonWriter.write(s.toJson()))
+                .thenApply(b -> FangguoSettings.fromJson(Json.obj(JsonReader.parseObject(b), "settings")));
+    }
+
     public CompletableFuture<FangguoSyncState> setCursor(String at) {
         Map<String, Object> json = new LinkedHashMap<>();
         json.put("at", at);

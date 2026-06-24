@@ -2,8 +2,10 @@ package io.podradar.crawler.model;
 
 import io.podradar.sdk.internal.Json;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,11 +32,14 @@ public final class FangguoRun {
     private final Map<String, Object> counts;
     private final Map<String, Object> jobParams;
     private final Live live;
+    private final String system;
+    private final List<CrawlerAccountRef> accounts;
 
     public FangguoRun(long id, long runId, String trigger, String mode, String windowFrom,
                       String windowTo, String status, String error, String startedAt, String finishedAt,
                       int queued, int fetched, int failed, int duplicate, Map<String, Object> counts,
-                      Map<String, Object> jobParams, Live live) {
+                      Map<String, Object> jobParams, Live live, String system,
+                      List<CrawlerAccountRef> accounts) {
         this.id = id;
         this.runId = runId;
         this.trigger = trigger;
@@ -52,6 +57,8 @@ public final class FangguoRun {
         this.counts = counts;
         this.jobParams = jobParams;
         this.live = live;
+        this.system = system;
+        this.accounts = accounts;
     }
 
     public long id()                       { return id; }
@@ -71,8 +78,16 @@ public final class FangguoRun {
     public Map<String, Object> counts()    { return counts; }
     public Map<String, Object> jobParams() { return jobParams; }
     public Live live()                     { return live; }
+    /** Always {@code "fangguo"}. */
+    public String system()                 { return system; }
+    /** Upstream accounts this run covered (a run sweeps every enabled account of its system). */
+    public List<CrawlerAccountRef> accounts() { return accounts; }
 
     public static FangguoRun fromJson(Map<String, Object> o) {
+        List<CrawlerAccountRef> accounts = new ArrayList<>();
+        for (Object raw : Json.list(o, "accounts")) {
+            accounts.add(CrawlerAccountRef.fromJson(Json.asMap(raw)));
+        }
         return new FangguoRun(
                 Json.lng(o, "id"),
                 o.containsKey("run_id") ? Json.lng(o, "run_id") : Json.lng(o, "id"),
@@ -90,7 +105,9 @@ public final class FangguoRun {
                 Json.integ(o, "duplicate"),
                 Json.obj(o, "counts"),
                 Json.obj(o, "job_params"),
-                Live.fromJson(Json.obj(o, "live")));
+                Live.fromJson(Json.obj(o, "live")),
+                Json.str(o, "system"),
+                Collections.unmodifiableList(accounts));
     }
 
     /** The {@code live} block: current per-kind asset tallies plus per-status label counts. */

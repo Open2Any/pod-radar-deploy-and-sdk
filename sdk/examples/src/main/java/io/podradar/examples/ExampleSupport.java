@@ -1,7 +1,9 @@
 package io.podradar.examples;
 
 import io.podradar.crawler.CrawlerClient;
+import io.podradar.crawler.model.HihumbirdAsset;
 import io.podradar.crawler.model.HihumbirdItem;
+import io.podradar.crawler.model.HihumbirdProduct;
 import io.podradar.crawler.model.RunSummary;
 import io.podradar.sdk.PodRadarClient;
 import io.podradar.sdk.error.PodRadarException;
@@ -241,12 +243,21 @@ final class ExampleSupport {
     }
 
     static void printCrawlerItem(HihumbirdItem it) {
-        System.out.printf("item id=%d status=%s kind=%s external=%s sales=%s batch=%s track=%s%n",
-                it.id(), nvl(it.status()), nvl(it.assetKind()), nvl(it.externalKey()),
-                nvl(it.salesOrderNo()), nvl(it.productionBatchCode()), nvl(it.trackNumber()));
-        System.out.printf("     title=%s style=%s/%s color=%s size=%s%n",
-                nvl(it.title()), nvl(it.styleCode()), nvl(it.styleName()), nvl(it.color()), nvl(it.size()));
-        System.out.printf("     thumb=%s full=%s error=%s%n", nvl(it.thumb()), nvl(it.full()), nvl(it.lastError()));
+        System.out.printf("item id=%d status=%s code=%s sales=%s batch=%s account=%s%n",
+                it.id(), nvl(it.statusName()), nvl(it.productionOrderItemCode()),
+                nvl(it.salesOrderNo()), nvl(it.productionBatchCode()), nvl(it.accountName()));
+        HihumbirdProduct p = it.product();
+        if (p != null) {
+            System.out.printf("     style=%s/%s color=%s size=%s%n",
+                    nvl(p.styleCode()), nvl(p.styleName()), nvl(p.color()), nvl(p.size()));
+        }
+        for (HihumbirdAsset a : it.assets()) {
+            System.out.printf("     asset kind=%s status=%s thumb=%s error=%s%n",
+                    nvl(a.assetKind()), nvl(a.status()), nvl(a.thumb()), nvl(a.lastError()));
+        }
+        if (it.label() != null) {
+            System.out.printf("     label status=%s pdf=%s%n", nvl(it.label().status()), nvl(it.label().pdfUrl()));
+        }
     }
 
     static boolean terminal(String status) {

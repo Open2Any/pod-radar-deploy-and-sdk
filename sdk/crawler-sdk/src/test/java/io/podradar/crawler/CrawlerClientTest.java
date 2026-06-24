@@ -3,7 +3,11 @@ package io.podradar.crawler;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import io.podradar.crawler.model.CreateKeyResponse;
 import io.podradar.crawler.model.CrawlStatus;
+import io.podradar.crawler.model.AccountTestResult;
+import io.podradar.crawler.model.CrawlerAccount;
 import io.podradar.crawler.model.CrawlerKey;
+import io.podradar.crawler.model.CreateAccountRequest;
+import io.podradar.crawler.model.TestAccountRequest;
 import io.podradar.crawler.model.HihumbirdSettings;
 import io.podradar.crawler.model.ItemRetryResponse;
 import io.podradar.crawler.model.ItemsFilter;
@@ -404,6 +408,78 @@ class CrawlerClientTest {
                 .willReturn(aResponse().withStatus(204)));
         client.deleteKey(6);
         server.verify(deleteRequestedFor(urlEqualTo("/api/v1/keys/6")));
+    }
+
+    // ───── accounts ─────────────────────────────────────────────────────
+
+    @Test
+    void listAccountsFiltersBySystem() {
+        server.stubFor(get(urlEqualTo("/api/v1/accounts?system=fangguo"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"accounts\":[{\"id\":3,\"system\":\"fangguo\",\"name\":\"默认(.env)\"," +
+                        "\"username\":\"19397991899\",\"enabled\":true,\"created_at\":\"2026-06-22T00:00:00Z\"}]}")));
+
+        List<CrawlerAccount> accts = client.listAccounts("fangguo");
+        assertEquals(1, accts.size());
+        assertEquals("fangguo", accts.get(0).system());
+        assertEquals("19397991899", accts.get(0).username());
+        assertTrue(accts.get(0).enabled());
+    }
+
+    @Test
+    void createAccountPostsCredentials() {
+        server.stubFor(post(urlEqualTo("/api/v1/accounts"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"id\":4,\"system\":\"fangguo\",\"name\":\"A店\",\"username\":\"u1\"," +
+                        "\"enabled\":true,\"created_at\":\"2026-06-22T00:00:00Z\"}")));
+
+        CrawlerAccount a = client.createAccount(
+                new CreateAccountRequest("fangguo", "A店", "u1", "p1").withTenantId("T9"));
+        assertEquals(4L, a.id());
+        server.verify(postRequestedFor(urlEqualTo("/api/v1/accounts"))
+                .withRequestBody(matchingJsonPath("$.username", equalTo("u1")))
+                .withRequestBody(matchingJsonPath("$.password", equalTo("p1")))
+                .withRequestBody(matchingJsonPath("$.tenant_id", equalTo("T9"))));
+    }
+
+    @Test
+    void setAccountEnabledPutsEnabledFlag() {
+        server.stubFor(put(urlEqualTo("/api/v1/accounts/4"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"id\":4,\"system\":\"fangguo\",\"name\":\"A店\",\"username\":\"u1\",\"enabled\":false}")));
+
+        CrawlerAccount a = client.setAccountEnabled(4, false);
+        assertFalse(a.enabled());
+        server.verify(putRequestedFor(urlEqualTo("/api/v1/accounts/4"))
+                .withRequestBody(equalToJson("{\"enabled\":false}")));
+    }
+
+    @Test
+    void testAccountByIdReturnsOk() {
+        server.stubFor(post(urlEqualTo("/api/v1/accounts/test"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"ok\":true}")));
+
+        AccountTestResult r = client.testAccount(TestAccountRequest.forAccount("fangguo", 3));
+        assertTrue(r.ok());
+        assertNull(r.error());
+        server.verify(postRequestedFor(urlEqualTo("/api/v1/accounts/test"))
+                .withRequestBody(matchingJsonPath("$.account_id", equalTo("3")))
+                .withRequestBody(matchingJsonPath("$.system", equalTo("fangguo"))));
+    }
+
+    @Test
+    void testAccountSurfacesLoginFailure() {
+        server.stubFor(post(urlEqualTo("/api/v1/accounts/test"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"ok\":false,\"error\":\"账号不存在\"}")));
+
+        AccountTestResult r = client.testAccount(
+                TestAccountRequest.withCredentials("hihumbird", "u1", "p1"));
+        assertFalse(r.ok());
+        assertEquals("账号不存在", r.error());
+        server.verify(postRequestedFor(urlEqualTo("/api/v1/accounts/test"))
+                .withRequestBody(matchingJsonPath("$.username", equalTo("u1")))
+                .withRequestBody(matchingJsonPath("$.password", equalTo("p1"))));
     }
 
     // ───── misc ───────────────────────────────────────────────────────

@@ -1,6 +1,11 @@
 package io.podradar.crawler;
 
+import io.podradar.crawler.model.CrawlerAccount;
 import io.podradar.crawler.model.CrawlerKey;
+import io.podradar.crawler.model.AccountTestResult;
+import io.podradar.crawler.model.CreateAccountRequest;
+import io.podradar.crawler.model.TestAccountRequest;
+import io.podradar.crawler.model.UpdateAccountRequest;
 import io.podradar.crawler.model.CreateKeyResponse;
 import io.podradar.crawler.model.HihumbirdSettings;
 import io.podradar.crawler.model.ItemRetryResponse;
@@ -65,6 +70,18 @@ public final class CrawlerAsyncClient implements AutoCloseable {
 
     public CompletableFuture<HihumbirdSettings> updateSettings(HihumbirdSettings s) {
         return http.putJsonAsync(API + "/hihumbird/settings", JsonWriter.write(s.toJson()))
+                .thenApply(b -> HihumbirdSettings.fromJson(Json.obj(JsonReader.parseObject(b), "settings")));
+    }
+
+    /** Per-account effective settings (global default merged with this account's override). */
+    public CompletableFuture<SettingsResponse> getSettings(long accountId) {
+        return http.getJsonAsync(API + "/hihumbird/settings?account_id=" + accountId)
+                .thenApply(b -> SettingsResponse.fromJson(JsonReader.parseObject(b)));
+    }
+
+    /** Write this account's settings override (full set). */
+    public CompletableFuture<HihumbirdSettings> updateSettings(long accountId, HihumbirdSettings s) {
+        return http.putJsonAsync(API + "/hihumbird/settings?account_id=" + accountId, JsonWriter.write(s.toJson()))
                 .thenApply(b -> HihumbirdSettings.fromJson(Json.obj(JsonReader.parseObject(b), "settings")));
     }
 
@@ -159,6 +176,48 @@ public final class CrawlerAsyncClient implements AutoCloseable {
 
     public CompletableFuture<Void> deleteKey(long id) {
         return http.deleteJsonAsync(API + "/keys/" + id).thenApply(b -> null);
+    }
+
+    // ───── accounts (upstream login accounts) ──────────────────────────
+
+    public CompletableFuture<List<CrawlerAccount>> listAccounts() {
+        return listAccounts(null);
+    }
+
+    public CompletableFuture<List<CrawlerAccount>> listAccounts(String system) {
+        String path = API + "/accounts" + (system != null ? "?system=" + CrawlerClient.urlEncode(system) : "");
+        return http.getJsonAsync(path).thenApply(b -> {
+            Map<String, Object> o = JsonReader.parseObject(b);
+            List<CrawlerAccount> out = new ArrayList<>();
+            for (Object raw : Json.list(o, "accounts")) {
+                out.add(CrawlerAccount.fromJson(Json.asMap(raw)));
+            }
+            return Collections.unmodifiableList(out);
+        });
+    }
+
+    public CompletableFuture<CrawlerAccount> createAccount(CreateAccountRequest req) {
+        return http.postJsonAsync(API + "/accounts", JsonWriter.write(req.toJson()))
+                .thenApply(b -> CrawlerAccount.fromJson(JsonReader.parseObject(b)));
+    }
+
+    public CompletableFuture<CrawlerAccount> updateAccount(long id, UpdateAccountRequest req) {
+        return http.putJsonAsync(API + "/accounts/" + id, JsonWriter.write(req.toJson()))
+                .thenApply(b -> CrawlerAccount.fromJson(JsonReader.parseObject(b)));
+    }
+
+    public CompletableFuture<CrawlerAccount> setAccountEnabled(long id, boolean enabled) {
+        return updateAccount(id, UpdateAccountRequest.empty().withEnabled(enabled));
+    }
+
+    public CompletableFuture<Void> deleteAccount(long id) {
+        return http.deleteJsonAsync(API + "/accounts/" + id).thenApply(b -> null);
+    }
+
+    /** Verify an upstream login without saving. Failed login → {@code ok=false} (not an exception). */
+    public CompletableFuture<AccountTestResult> testAccount(TestAccountRequest req) {
+        return http.postJsonAsync(API + "/accounts/test", JsonWriter.write(req.toJson()))
+                .thenApply(b -> AccountTestResult.fromJson(JsonReader.parseObject(b)));
     }
 
     // ───── misc ───────────────────────────────────────────────────────

@@ -32,12 +32,17 @@ public final class FangguoItem {
     private final FangguoOrderInfo order;
     private final List<FangguoAsset> assets;
     private final List<FangguoLabel> labels;
+    private final Long accountId;
+    private final String accountName;
+    private final String accountUsername;
+    private final String system;
 
     public FangguoItem(long id, long orderId, String tid, String unitKey, String barcode,
                        String coverTaskId, String oid, String skuId, String skuExtCode,
                        String factoryEncode, String skuProps, String coverStatus, Integer unitIdx,
                        Integer unitTotal, String sourceCreatedAt, FangguoOrderInfo order,
-                       List<FangguoAsset> assets, List<FangguoLabel> labels) {
+                       List<FangguoAsset> assets, List<FangguoLabel> labels, Long accountId,
+                       String accountName, String accountUsername, String system) {
         this.id = id;
         this.orderId = orderId;
         this.tid = tid;
@@ -56,6 +61,10 @@ public final class FangguoItem {
         this.order = order;
         this.assets = assets;
         this.labels = labels;
+        this.accountId = accountId;
+        this.accountName = accountName;
+        this.accountUsername = accountUsername;
+        this.system = system;
     }
 
     public long id()                  { return id; }
@@ -76,6 +85,13 @@ public final class FangguoItem {
     public FangguoOrderInfo order()   { return order; }
     public List<FangguoAsset> assets() { return assets; }
     public List<FangguoLabel> labels() { return labels; }
+    /** Upstream account this unit was crawled under, or {@code null} (.env fallback / legacy). */
+    public Long accountId()           { return accountId; }
+    public String accountName()       { return accountName; }
+    /** The account's upstream login username, or {@code null}. */
+    public String accountUsername()   { return accountUsername; }
+    /** Always {@code "fangguo"}. */
+    public String system()            { return system; }
 
     public static FangguoItem fromJson(Map<String, Object> o) {
         List<FangguoAsset> assets = new ArrayList<>();
@@ -104,10 +120,18 @@ public final class FangguoItem {
                 Json.str(o, "source_created_at"),
                 FangguoOrderInfo.fromJson(Json.obj(o, "order")),
                 Collections.unmodifiableList(assets),
-                Collections.unmodifiableList(labels));
+                Collections.unmodifiableList(labels),
+                nullableLong(o.get("account_id")),
+                Json.str(o, "account_name"),
+                Json.str(o, "account_username"),
+                Json.str(o, "system"));
     }
 
     private static Integer nullableInt(Object v) {
         return v instanceof Number ? ((Number) v).intValue() : null;
+    }
+
+    private static Long nullableLong(Object v) {
+        return v instanceof Number ? ((Number) v).longValue() : null;
     }
 }

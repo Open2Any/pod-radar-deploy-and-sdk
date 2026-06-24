@@ -19,6 +19,7 @@ public final class ItemsFilter {
     private Long createdTo;
     private Long productionFrom;
     private Long productionTo;
+    private Long accountId;
     private PageQuery page = PageQuery.of(10, 0);
 
     private ItemsFilter() {}
@@ -43,6 +44,7 @@ public final class ItemsFilter {
         this.productionTo = toMs;
         return this;
     }
+    public ItemsFilter withAccountId(long id)                    { this.accountId = id; return this; }
     public ItemsFilter withPage(PageQuery page)                  { this.page = page; return this; }
 
     public Long runId()                       { return runId; }
@@ -57,6 +59,7 @@ public final class ItemsFilter {
     public Long createdTo()                   { return createdTo; }
     public Long productionFrom()              { return productionFrom; }
     public Long productionTo()                { return productionTo; }
+    public Long accountId()                   { return accountId; }
     public PageQuery page()                   { return page; }
 
     /** Query parameters as a key-value map (in insertion order). Values are pre-encoded strings. */
@@ -74,6 +77,7 @@ public final class ItemsFilter {
         if (createdTo != null) q.put("created_to", String.valueOf(createdTo));
         if (productionFrom != null) q.put("production_from", String.valueOf(productionFrom));
         if (productionTo != null) q.put("production_to", String.valueOf(productionTo));
+        if (accountId != null) q.put("account_id", String.valueOf(accountId));
         q.put("limit", String.valueOf(page.limit()));
         q.put("offset", String.valueOf(page.offset()));
         return q;

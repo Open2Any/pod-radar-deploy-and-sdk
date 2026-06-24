@@ -25,11 +25,14 @@ public final class RunSummary {
     private final int duplicate;
     private final Map<String, Object> counts;
     private final List<RunFailure> failures;
+    private final String system;
+    private final List<CrawlerAccountRef> accounts;
 
     public RunSummary(long id, String trigger, String mode, Long windowFrom, Long windowTo,
                       String status, String error, String startedAt, String finishedAt,
                       Map<String, Object> jobParams, int queued, int fetched, int failed,
-                      int duplicate, Map<String, Object> counts, List<RunFailure> failures) {
+                      int duplicate, Map<String, Object> counts, List<RunFailure> failures,
+                      String system, List<CrawlerAccountRef> accounts) {
         this.id = id;
         this.trigger = trigger;
         this.mode = mode;
@@ -46,6 +49,8 @@ public final class RunSummary {
         this.duplicate = duplicate;
         this.counts = counts;
         this.failures = failures;
+        this.system = system;
+        this.accounts = accounts;
     }
 
     public long id()             { return id; }
@@ -64,11 +69,19 @@ public final class RunSummary {
     public int duplicate()       { return duplicate; }
     public Map<String, Object> counts() { return counts; }
     public List<RunFailure> failures() { return failures; }
+    /** Always {@code "hihumbird"}. */
+    public String system()       { return system; }
+    /** Upstream accounts this run covered (a run sweeps every enabled account of its system). */
+    public List<CrawlerAccountRef> accounts() { return accounts; }
 
     public static RunSummary fromJson(Map<String, Object> o) {
         List<RunFailure> failures = new ArrayList<>();
         for (Object raw : Json.list(o, "failures")) {
             failures.add(RunFailure.fromJson(Json.asMap(raw)));
+        }
+        List<CrawlerAccountRef> accounts = new ArrayList<>();
+        for (Object raw : Json.list(o, "accounts")) {
+            accounts.add(CrawlerAccountRef.fromJson(Json.asMap(raw)));
         }
         return new RunSummary(
                 Json.lng(o, "id"),
@@ -86,7 +99,9 @@ public final class RunSummary {
                 Json.integ(o, "failed"),
                 Json.integ(o, "duplicate"),
                 Json.obj(o, "counts"),
-                Collections.unmodifiableList(failures));
+                Collections.unmodifiableList(failures),
+                Json.str(o, "system"),
+                Collections.unmodifiableList(accounts));
     }
 
     private static Long nullableLong(Object v) {

@@ -19,6 +19,7 @@ public final class FangguoItemsFilter {
     private FangguoCrawlStatus crawlStatus;
     private Long createdFrom;
     private Long createdTo;
+    private Long accountId;
     private PageQuery page = PageQuery.of(10, 0);
 
     private FangguoItemsFilter() {}
@@ -36,6 +37,7 @@ public final class FangguoItemsFilter {
         this.createdTo = toMs;
         return this;
     }
+    public FangguoItemsFilter withAccountId(long id)             { this.accountId = id; return this; }
     public FangguoItemsFilter withPage(PageQuery page)            { this.page = page; return this; }
 
     public Long runId()                  { return runId; }
@@ -44,6 +46,7 @@ public final class FangguoItemsFilter {
     public FangguoCrawlStatus crawlStatus() { return crawlStatus; }
     public Long createdFrom()            { return createdFrom; }
     public Long createdTo()              { return createdTo; }
+    public Long accountId()              { return accountId; }
     public PageQuery page()              { return page; }
 
     /** Query parameters as a key-value map (in insertion order). */
@@ -55,6 +58,7 @@ public final class FangguoItemsFilter {
         if (crawlStatus != null) params.put("crawl_status", crawlStatus.wire());
         if (createdFrom != null) params.put("created_from", String.valueOf(createdFrom));
         if (createdTo != null) params.put("created_to", String.valueOf(createdTo));
+        if (accountId != null) params.put("account_id", String.valueOf(accountId));
         params.put("limit", String.valueOf(page.limit()));
         params.put("offset", String.valueOf(page.offset()));
         return params;

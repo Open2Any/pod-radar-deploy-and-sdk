@@ -50,6 +50,18 @@ public final class FangguoApi {
         return FangguoSettings.fromJson(Json.obj(JsonReader.parseObject(body), "settings"));
     }
 
+    /** Per-account effective settings (global default merged with this account's override). */
+    public FangguoSettingsResponse getSettings(long accountId) {
+        return FangguoSettingsResponse.fromJson(
+                JsonReader.parseObject(http.getJson(BASE + "/settings?account_id=" + accountId)));
+    }
+
+    /** Write this account's settings override (full set; each account schedules on its own cursor/interval). */
+    public FangguoSettings updateSettings(long accountId, FangguoSettings s) {
+        String body = http.putJson(BASE + "/settings?account_id=" + accountId, JsonWriter.write(s.toJson()));
+        return FangguoSettings.fromJson(Json.obj(JsonReader.parseObject(body), "settings"));
+    }
+
     /**
      * {@code POST /cursor} → force the incremental cursor to {@code at} (ISO-8601), or clear it with
      * {@code null}. Returns the updated cursor state. Throws if a run is currently in progress (409).
