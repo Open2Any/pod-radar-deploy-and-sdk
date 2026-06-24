@@ -91,7 +91,6 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 | `S3_SECRET_ACCESS_KEY` | Yes | `...` | S3 secret key. |
 | `S3_BUCKET_IMAGES` | Yes | `pod-radar-images` | Bucket for original images. |
 | `S3_BUCKET_THUMBS` | Yes | `pod-radar-thumbs` | Bucket for thumbnails. |
-| `S3_BUCKET_DOCS` | Yes | `pod-radar-docs` | Bucket for documents. |
 | `S3_BUCKET_ACCESS` | Yes | `public` | `public` returns direct object URLs; `private` returns presigned URLs. |
 
 ### Bootstrap Admin
@@ -162,7 +161,7 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 
 ## Notes
 
-- Buckets are not created by Docker. Create `S3_BUCKET_IMAGES`, `S3_BUCKET_THUMBS`, and `S3_BUCKET_DOCS` in your external object store.
+- Buckets are not created by Docker. Create `S3_BUCKET_IMAGES` and `S3_BUCKET_THUMBS` in your external object store.
 - `.env` in this directory is the deployment env file. `DATABASE_URL` in it is useful for host-side scripts; the compose file sets the container-side database URL to the internal service name.
 - `./logs` is relative to this deployment directory.
 - Do not put object-storage credentials in the Dockerfile. Runtime configuration belongs in `.env` or your deployment secret manager.
