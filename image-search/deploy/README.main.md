@@ -132,6 +132,10 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 | `EMBEDDING_TIMEOUT` | No | `30` | Embedding request timeout in seconds. |
 | `EMBEDDING_API_KEY` | Required if embeddings enabled | `...` | Provider API key. |
 | `EMBEDDING_SLUG` | No | `qwen3_vl_embedding` | Optional override for the table slug. Defaults to the model name (no provider prefix); the vector table is `image_emb_<slug>_<dim>`. |
+| `EMBEDDING_TEXT_PRICE` | No | `0.0000007` | Text per-unit price seeded into the models row at `db:push` (per-token = price per 1M ÷ 1e6). Empty = no cost tracking. |
+| `EMBEDDING_IMAGE_PRICE` | No | `0.0000018` | Image per-unit price (vision tokens). Empty falls back to the text price. |
+| `EMBEDDING_PRICE_UNIT` | No | `token` | Unit the prices are charged against (`token`, `image`, or `second`). |
+| `EMBEDDING_CURRENCY` | No | `CNY` | Currency for the seeded prices. Defaults to `USD`. |
 
 ### Worker Tuning
 
