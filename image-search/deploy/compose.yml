@@ -31,8 +31,6 @@ x-main-env: &main-env
   # S3_* intentionally comes from .env. This compose stack does not start
   # MinIO; point S3_ENDPOINT / credentials at your external object storage.
   BACKEND_URL: http://pod-radar-backend:3001
-  CRAWLER_WEB_URL: ${CRAWLER_WEB_URL:-${NEXT_PUBLIC_CRAWLER_WEB_URL:-}}
-  NEXT_PUBLIC_CRAWLER_WEB_URL: ${NEXT_PUBLIC_CRAWLER_WEB_URL:-}
 
 services:
   pgvector:

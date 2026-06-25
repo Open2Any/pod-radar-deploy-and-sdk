@@ -36,6 +36,7 @@ Browserless is still part of this stack because hihumbird product images require
    - Fill `CRAWLER_S3_ENDPOINT`, `CRAWLER_S3_ACCESS_KEY_ID`, `CRAWLER_S3_SECRET_ACCESS_KEY`, and bucket names.
    - Create the crawler S3 buckets before starting workers.
    - Set `CRAWLER_ADMIN_KEY`.
+   - Set `IMAGE_TOKEN_SECRET` to a long random value, for example `openssl rand -hex 32`.
    - Set `HIHUMBIRD_USERNAME` and `HIHUMBIRD_PASSWORD`.
    - Keep `CRAWLER_HARVEST_ENABLED=true` for product-image rendering, or set it to `false` to disable the headless harvest worker.
 
@@ -92,8 +93,8 @@ Browserless is still part of this stack because hihumbird product images require
 
 | Variable | Required | Example | Description |
 | --- | --- | --- | --- |
-| `CRAWLER_ASSET_PREFIX` | No | `/crawler` | Public prefix for crawler-web static assets. Leave empty for direct host/port access. Set only when a reverse proxy or CDN serves Next assets under that prefix. |
-| `CRAWLER_WEB_URL` | No | `/crawler` | Browser-visible crawler web URL used by links and redirects. Use a relative path for same-domain reverse proxy or an absolute `https://...` URL for a separate host. |
+| `CRAWLER_ASSET_PREFIX` | No | empty | Public prefix for crawler-web static assets. Leave empty for a standalone crawler domain. Set only when a CDN or proxy serves Next assets under a subpath. |
+| `CRAWLER_WEB_URL` | No | empty | Optional browser-visible crawler web URL used by redirects/links. Leave empty for the standalone crawler web app. |
 
 ### Runtime API And Web
 
@@ -126,6 +127,7 @@ Browserless is still part of this stack because hihumbird product images require
 | --- | --- | --- | --- |
 | `CRAWLER_ADMIN_NAME` | Yes | `admin` | Admin name used by the crawler API. |
 | `CRAWLER_ADMIN_KEY` | Yes | `pod-radar_replace_with_a_long_random_value` | Admin API key. Must start with `pod-radar_` and be at least 20 characters. |
+| `IMAGE_TOKEN_SECRET` | Yes | `<long random value>` | Shared production HMAC secret for image-token signing. Generate with `openssl rand -hex 32`. |
 | `CRAWLER_CREDENTIAL_SECRET` | Yes if managing accounts | `<long random value>` | AES-256-GCM key encrypting upstream account credentials in `crawler_accounts`. Required once you manage/crawl accounts via the accounts API. Lose it and every stored account must be re-entered. |
 | `CRAWLER_ADMIN_API_KEYS` | No | `pod-radar_key1,pod-radar_key2` | Optional legacy comma-separated fallback admin keys for multi-key deployments. |
 

@@ -7,8 +7,6 @@
 | `/` | main web `127.0.0.1:5174` |
 | `/api/*` | main backend `127.0.0.1:3001` |
 | `/docs`, `/openapi.json` | main backend `127.0.0.1:3001` |
-| `/crawler/*` | crawler web `127.0.0.1:5175` |
-| `/crawler-api/*` | crawler API `127.0.0.1:3002` |
 | `/pod-radar-*/*` | MinIO public object URLs |
 
 ## 系统 Nginx
@@ -30,6 +28,6 @@ docker compose -f docker-compose.nginx.yml up -d
 Nginx 起好后，重启 PM2 让服务改为 localhost-only：
 
 ```bash
-pm2 restart pod-radar-backend pod-radar-web pod-radar-crawler-api pod-radar-crawler-web --update-env
+pm2 restart pod-radar-backend pod-radar-web --update-env
 pm2 save
 ```

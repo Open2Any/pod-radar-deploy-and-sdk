@@ -24,8 +24,6 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
    cp compose.env.example .env
    ```
 
-   If deploying the crawler stack on the same machine, merge `compose.crawler.env.example` into the same `.env`.
-
 2. Edit `.env`:
 
    - Set `MAIN_IMAGE` to the image tag you want to deploy.
@@ -104,8 +102,6 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 
 | Variable | Required | Example | Description |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_CRAWLER_WEB_URL` | No | `/crawler` | Browser-visible crawler UI URL shown from the main UI. Use a relative path for same-domain reverse proxy or an absolute `https://...` URL for a separate host. |
-| `CRAWLER_WEB_URL` | No | `/crawler` | Server-side redirect target for old crawler routes. Defaults to `NEXT_PUBLIC_CRAWLER_WEB_URL` in compose. |
 | `NEXT_PUBLIC_SEARCH_MIN_SCORE` | No | `0.5` | Public search threshold used at build time. |
 | `SEARCH_MIN_SCORE` | No | `0.5` | Runtime search threshold. |
 | `SEARCH_DUPLICATE_REVIEW_ENABLED` | No | `true` | Enables duplicate-review workflow. |
