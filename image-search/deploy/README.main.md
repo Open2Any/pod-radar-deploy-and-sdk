@@ -125,13 +125,13 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 | Variable | Required | Example | Description |
 | --- | --- | --- | --- |
 | `EMBEDDING_ENABLED` | No | `true` | Runs embedding jobs by default. Set `false` to keep the embed worker idle. |
-| `EMBEDDING_PROVIDER` | No | `dashscope` | Embedding provider identifier. |
+| `EMBEDDING_PROVIDER` | No | `dashscope` | Which HTTP client/endpoint to call at runtime. Switching providers (e.g. openai-compat ↔ dashscope native) keeps vectors compatible — no re-embed, no new table. |
 | `EMBEDDING_MODEL` | No | `qwen3-vl-embedding` | Embedding model name. |
 | `EMBEDDING_BASE_URL` | No | `https://dashscope.aliyuncs.com/...` | Embedding API endpoint. |
 | `EMBEDDING_DIMENSION` | No | `2560` | Vector dimension expected by the database. |
 | `EMBEDDING_TIMEOUT` | No | `30` | Embedding request timeout in seconds. |
 | `EMBEDDING_API_KEY` | Required if embeddings enabled | `...` | Provider API key. |
-| `EMBEDDING_SLUG` | No | `dashscope_qwen3_vl_embedding` | Optional stable embedding configuration slug. |
+| `EMBEDDING_SLUG` | No | `qwen3_vl_embedding` | Optional override for the table slug. Defaults to the model name (no provider prefix); the vector table is `image_emb_<slug>_<dim>`. |
 
 ### Worker Tuning
 

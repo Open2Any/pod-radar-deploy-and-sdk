@@ -73,8 +73,11 @@ public final class CrawlerDemo {
                 items.total(), items.limit(), items.offset(),
                 items.historyOrderDays().isPresent() ? items.historyOrderDays().getAsInt() : "-");
         for (HihumbirdItem it : items.items()) {
-            System.out.printf("%d %-16s %-8s %s%n",
-                    it.id(), nvl(it.assetKind()), nvl(it.status()), nvl(it.productionOrderItemCode()));
+            // assetKind/status live on each HihumbirdAsset now (an item can carry
+            // several assets); the item itself exposes statusName() + assets().
+            int assetCount = it.assets() == null ? 0 : it.assets().size();
+            System.out.printf("%d status=%-10s assets=%-3d %s%n",
+                    it.id(), nvl(it.statusName()), assetCount, nvl(it.productionOrderItemCode()));
         }
     }
 
