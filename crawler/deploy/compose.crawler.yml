@@ -24,6 +24,10 @@ x-app-common: &app-common
 x-crawler-env: &crawler-env
   TZ: Asia/Shanghai
   DATA_DIR: /app/data
+  # 封住 glibc malloc arena 碎片(默认上限 8×核数)——配合镜像内 sharp.concurrency(1)/
+  # cache(false) 防止 fetcher 处理图片时 RSS 单调增长。pm2 版在 ecosystem 里设过,
+  # docker 部署必须在这里显式设,否则容器内不生效。
+  MALLOC_ARENA_MAX: "2"
   CRAWLER_HOST: 0.0.0.0
   CRAWLER_PORT: "3002"
   CRAWLER_WEB_HOST: 0.0.0.0
@@ -135,6 +139,8 @@ services:
   pod-radar-hihumbird-fetcher:
     <<: *app-common
     scale: ${HIHUMBIRD_FETCHER_REPLICAS:-1}
+    # 兜底:吃图 worker 残留增长时由 docker 在到顶时回收(restart 策略拉回),保护整机不被涨爆。
+    mem_limit: ${HIHUMBIRD_FETCHER_MEM_LIMIT:-1500m}
     environment:
       <<: *crawler-env
     working_dir: /app/packages/crawler
