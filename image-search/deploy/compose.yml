@@ -46,9 +46,9 @@ services:
     ports:
       - "${POSTGRES_HOST_BIND:-0.0.0.0}:${POSTGRES_HOST_PORT:-5544}:5432"
     volumes:
-      # timescaledb-ha keeps PGDATA at /var/lib/postgresql/data, NOT the stock
+      # timescaledb-ha keeps PGDATA at /home/postgres/pgdata/data, NOT the stock
       # /var/lib/postgresql/data — bind-mounting the wrong path silently loses data.
-      - ./data/pgdata:/var/lib/postgresql/data
+      - ./data/pgdata:/home/postgres/pgdata/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-pod_radar} -d pod_radar"]
       interval: 5s
@@ -64,15 +64,15 @@ services:
       -c max_connections=200
       -c random_page_cost=1.1
 
-  main-db-push:
-    <<: *app-common
-    restart: "no"
-    environment:
-      <<: *main-env
-    depends_on:
-      pgvector:
-        condition: service_healthy
-    command: ["pnpm", "db:push"]
+  # main-db-push:
+  #   <<: *app-common
+  #   restart: "no"
+  #   environment:
+  #     <<: *main-env
+  #   depends_on:
+  #     pgvector:
+  #       condition: service_healthy
+  #   command: ["pnpm", "db:push"]
 
   pod-radar-backend:
     <<: *app-common
@@ -82,8 +82,8 @@ services:
     depends_on:
       pgvector:
         condition: service_healthy
-      main-db-push:
-        condition: service_completed_successfully
+      # main-db-push:
+      #   condition: service_completed_successfully
     ports:
       - "${BACKEND_HOST_BIND:-0.0.0.0}:${BACKEND_PORT:-3001}:3001"
     command: ["bun", "run", "start"]
